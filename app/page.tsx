@@ -1,65 +1,129 @@
-import Image from "next/image";
+"use client";
 
-export default function Home() {
+import { useState } from "react";
+import type { UiEvent } from "./types/event";
+
+import { WeekControls } from "./components/WeekControls";
+import { ScheduleGrid } from "./components/ScheduleGrid";
+import { AddEventModal } from "./components/AddEventModal";
+
+import { useSchedule } from "./hooks/useSchedule";
+import { useDragResize } from "./hooks/useDragResize";
+
+// ===== helpers =====
+function addDays(d: Date, days: number) {
+  const x = new Date(d);
+  x.setDate(x.getDate() + days);
+  return x;
+}
+
+function toYMD(d: Date) {
+  return d.toISOString().slice(0, 10);
+}
+
+// Monday-based start of week
+function startOfWeekMonday(d: Date) {
+  const x = new Date(d);
+  x.setHours(0, 0, 0, 0);
+  const day = x.getDay(); // Sun=0..Sat=6
+  const diff = day === 0 ? -6 : 1 - day;
+  x.setDate(x.getDate() + diff);
+  return x;
+}
+
+function ddmm(d: Date) {
+  const dd = String(d.getDate()).padStart(2, "0");
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  return `${dd}/${mm}`;
+}
+
+function pad(n: number) {
+  return n < 10 ? `0${n}` : `${n}`;
+}
+
+function toHHMM(iso: string) {
+  const d = new Date(iso);
+  return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function eventDataEvent(ev: UiEvent) {
+  return ev.eventType === "study_plan" ? "event-1" : "event-2";
+}
+
+const DAYS = [
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+  "Sunday",
+];
+
+export default function Page() {
+  const [weekStart, setWeekStart] = useState<Date>(() =>
+    startOfWeekMonday(new Date())
+  );
+  const [showAdd, setShowAdd] = useState(false);
+
+  const weekEnd = addDays(weekStart, 6);
+
+  // Data layer: load week + grouped + createEvent
+  const { events, setEvents, loading, setLoading, grouped, createEvent } =
+    useSchedule(weekStart, 1);
+
+  // Drag/resize layer: ALL in hook now (no drag logic in page.tsx)
+  useDragResize({ events, setEvents, timelineEnd: "18:00" });
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
+    <>
+      <header className="cd-main-header text-center flex flex-column flex-center">
+        <h1 className="text-xl">Schedule Template (CodyHouse + UserEvent)</h1>
+      </header>
+
+      <WeekControls
+        weekStart={weekStart}
+        weekEnd={weekEnd}
+        toYMD={toYMD}
+        ddmm={ddmm}
+        onPrev={() => {
+          setLoading(true);
+          setWeekStart((p) => addDays(p, -7));
+        }}
+        onNext={() => {
+          setLoading(true);
+          setWeekStart((p) => addDays(p, 7));
+        }}
+        onPickDate={(picked) => {
+          setLoading(true);
+          setWeekStart(startOfWeekMonday(picked));
+        }}
+        onAddEvent={() => setShowAdd(true)}
+      />
+
+      {loading ? (
+        <p style={{ textAlign: "center" }}>Loading...</p>
+      ) : (
+        <ScheduleGrid
+          days={DAYS}
+          weekStart={weekStart}
+          grouped={grouped}
+          addDays={addDays}
+          ddmm={ddmm}
+          toHHMM={toHHMM}
+          eventDataEvent={eventDataEvent}
         />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+      )}
+
+      <AddEventModal
+        open={showAdd}
+        onClose={() => setShowAdd(false)}
+        onSubmit={createEvent}
+        weekStart={weekStart}
+        days={DAYS}
+        toYMD={toYMD}
+        addDays={addDays}
+      />
+    </>
   );
 }
