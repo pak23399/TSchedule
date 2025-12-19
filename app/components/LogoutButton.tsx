@@ -3,6 +3,7 @@
 export function LogoutButton() {
   const onLogout = async () => {
     await fetch("/api/auth/logout", { method: "POST" });
+    localStorage.removeItem("accessToken");
     window.location.href = "/login";
   };
 

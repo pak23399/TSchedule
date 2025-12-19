@@ -3,13 +3,24 @@
 import { useEffect } from "react";
 import type { UiEvent } from "../types/event";
 
+type Options = {
+  events: UiEvent[];
+  setEvents: React.Dispatch<React.SetStateAction<UiEvent[]>>;
+
+  /** timeline UI đang render, default 09:00 -> 18:00 */
+  timelineMinHHMM?: string; // "09:00"
+  timelineMaxHHMM?: string; // "18:00"
+
+  /**
+   * Nếu backend .NET yêu cầu Bearer token:
+   * truyền vào hàm getToken() để hook tự attach Authorization header.
+   * (Nếu chưa auth thì cứ bỏ trống)
+   */
+  getToken?: () => string | null;
+};
+
 function pad(n: number) {
   return n < 10 ? `0${n}` : `${n}`;
-}
-
-function toHHMM(iso: string) {
-  const d = new Date(iso);
-  return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
 function minutesFromHHMM(time: string) {
@@ -23,28 +34,40 @@ function hhmmFromMinutes(min: number) {
   return `${pad(h)}:${pad(m)}`;
 }
 
-type Params = {
-  events: UiEvent[];
-  setEvents: React.Dispatch<React.SetStateAction<UiEvent[]>>;
-  timelineEnd?: string; // default "18:00"
-};
+function normalizeTimeForDb(hhmmOrHhmmss: string) {
+  // "14:00" -> "14:00:00"
+  if (!hhmmOrHhmmss) return hhmmOrHhmmss;
+  return hhmmOrHhmmss.length === 5 ? `${hhmmOrHhmmss}:00` : hhmmOrHhmmss;
+}
 
-export function useDragResize({ events, setEvents, timelineEnd = "18:00" }: Params) {
+function isHHMM(s: string) {
+  return /^([01]\d|2[0-3]):[0-5]\d$/.test(s);
+}
+
+export function useDragResize({
+  events,
+  setEvents,
+  timelineMinHHMM = "09:00",
+  timelineMaxHHMM = "18:00",
+  getToken,
+}: Options) {
   useEffect(() => {
     const root = document.querySelector(".js-cd-schedule") as HTMLElement | null;
     if (!root) return;
 
-    // remove loading class
+    // remove loading class (nếu có)
     root.classList.remove("cd-schedule--loading");
 
     if (events.length === 0) return;
 
     const timelineItems = root
-      .querySelector(".cd-schedule__timeline")!
-      .getElementsByTagName("li");
+      .querySelector(".cd-schedule__timeline")
+      ?.getElementsByTagName("li");
+
+    if (!timelineItems || timelineItems.length < 2) return;
 
     const timelineStart = minutesFromHHMM(
-      (timelineItems[0].textContent || "09:00").trim()
+      (timelineItems[0].textContent || timelineMinHHMM).trim()
     );
     const timelineUnitDuration =
       minutesFromHHMM((timelineItems[1].textContent || "09:30").trim()) -
@@ -59,32 +82,69 @@ export function useDragResize({ events, setEvents, timelineEnd = "18:00" }: Para
       "cd-schedule__event"
     ) as HTMLCollectionOf<HTMLElement>;
 
-    // 1) placement: set top/height from data-start/end on <a>
+    // ===== 1) placement: set top/height theo data-start/end (đúng CodyHouse) =====
     for (let i = 0; i < singleEvents.length; i++) {
       const li = singleEvents[i];
       const a = li.getElementsByTagName("a")[0];
+      if (!a) continue;
 
-      const start = minutesFromHHMM(a.getAttribute("data-start") || "09:00");
+      const start = minutesFromHHMM(a.getAttribute("data-start") || timelineMinHHMM);
       const end = minutesFromHHMM(a.getAttribute("data-end") || "10:00");
       const duration = end - start;
 
-      const eventTop =
-        (slotHeight * (start - timelineStart)) / timelineUnitDuration;
+      const eventTop = (slotHeight * (start - timelineStart)) / timelineUnitDuration;
       const eventHeight = (slotHeight * duration) / timelineUnitDuration;
 
       li.style.top = `${eventTop - 1}px`;
       li.style.height = `${eventHeight + 1}px`;
     }
 
-    const groups = Array.from(
-      root.querySelectorAll(".cd-schedule__group")
-    ) as HTMLElement[];
+    const groups = Array.from(root.querySelectorAll(".cd-schedule__group")) as HTMLElement[];
 
-    const onDragEndUpdate = async (
-      li: HTMLElement,
-      a: HTMLAnchorElement,
-      dayIdx: number
-    ) => {
+    const clamp = (v: number, min: number, max: number) => Math.max(min, Math.min(max, v));
+
+    // ===== 2) gọi .NET PATCH =====
+    const patchDotnet = async (id: number, payload: any) => {
+      const base = process.env.NEXT_PUBLIC_API_URL; // ví dụ: http://localhost:5251
+      const url = base ? `${base}/api/events/${id}` : `/api/events/${id}`;
+
+      // ✅ ĐỌC TRỰC TIẾP TOKEN (an toàn nhất cho drag/resize)
+      const token =
+        typeof window !== "undefined"
+          ? localStorage.getItem("accessToken")
+          : null;
+
+      if (!token) {
+        console.error("PATCH aborted: missing accessToken");
+        throw new Error("Not authenticated");
+      }
+
+      const resp = await fetch(url, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!resp.ok) {
+        const text = await resp.text().catch(() => "");
+        console.error("PATCH failed", {
+          url,
+          status: resp.status,
+          text,
+        });
+        throw new Error(
+          `PATCH ${url} failed (${resp.status}): ${text || resp.statusText}`
+        );
+      }
+
+      return resp;
+    };
+
+    // ===== 3) khi thả chuột: tính lại time/day rồi update db + update UI =====
+    const onDragEndUpdate = async (li: HTMLElement, a: HTMLAnchorElement, dayIdx: number) => {
       const idStr = li.dataset.eventId;
       if (!idStr) return;
       const id = Number(idStr);
@@ -95,19 +155,12 @@ export function useDragResize({ events, setEvents, timelineEnd = "18:00" }: Para
       const top = parseFloat(li.style.top || "0");
       const height = parseFloat(li.style.height || "0");
 
-      const clamp = (v: number, min: number, max: number) =>
-        Math.max(min, Math.min(max, v));
-      const isHHMM = (s: string) => /^([01]\d|2[0-3]):[0-5]\d$/.test(s);
+      const timelineMin = timelineStart;
+      const timelineMax = minutesFromHHMM(timelineMaxHHMM);
 
-      const timelineMin = timelineStart; // e.g. 09:00
-      const timelineMax = minutesFromHHMM(timelineEnd); // e.g. 18:00
-
-      // px -> minutes
-      const rawStartMinutes =
-        timelineStart + (top / slotHeight) * timelineUnitDuration;
+      const rawStartMinutes = timelineStart + (top / slotHeight) * timelineUnitDuration;
       const rawDurationMinutes = (height / slotHeight) * timelineUnitDuration;
 
-      // snap to step
       let startMinutes =
         Math.round(rawStartMinutes / timelineUnitDuration) * timelineUnitDuration;
 
@@ -116,58 +169,44 @@ export function useDragResize({ events, setEvents, timelineEnd = "18:00" }: Para
 
       durationMinutes = Math.max(timelineUnitDuration, durationMinutes);
 
-      // clamp inside timeline
-      startMinutes = clamp(
-        startMinutes,
-        timelineMin,
-        timelineMax - timelineUnitDuration
-      );
+      startMinutes = clamp(startMinutes, timelineMin, timelineMax - timelineUnitDuration);
 
       let endMinutes = startMinutes + durationMinutes;
       endMinutes = clamp(endMinutes, startMinutes + timelineUnitDuration, timelineMax);
 
-      const newStartTime = hhmmFromMinutes(startMinutes);
-      const newEndTime = hhmmFromMinutes(endMinutes);
+      const newStartHHMM = hhmmFromMinutes(startMinutes);
+      const newEndHHMM = hhmmFromMinutes(endMinutes);
 
-      if (!isHHMM(newStartTime) || !isHHMM(newEndTime)) return;
+      if (!isHHMM(newStartHHMM) || !isHHMM(newEndHHMM)) return;
 
-      // send HH:MM:SS to backend
-      const startTimeDb = `${newStartTime}:00`;
-      const endTimeDb = `${newEndTime}:00`;
+      // Backend TIME thường cần "HH:mm:ss"
+      const startTimeDb = normalizeTimeForDb(newStartHHMM);
+      const endTimeDb = normalizeTimeForDb(newEndHHMM);
 
-      const resp = await fetch(`/api/events/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          dayIndex: dayIdx,
-          startTime: startTimeDb,
-          endTime: endTimeDb,
-        }),
+      // 1) update DB (gọi .NET)
+      await patchDotnet(id, {
+        dayIndex: dayIdx,
+        startTime: startTimeDb,
+        endTime: endTimeDb,
       });
 
-      if (!resp.ok) {
-        // nếu muốn debug:
-        // console.log("PATCH failed", resp.status, await resp.text());
-        return;
-      }
-
-      // update UI state for THIS WEEK rendering
-      const base = new Date(ev.startIso);
+      // 2) update state UI (để render lại đúng trong tuần hiện tại)
+      const baseDate = new Date(ev.startIso);
       const diff = dayIdx - ev.dayIndex;
 
-      const startDate = new Date(base);
+      const startDate = new Date(baseDate);
       startDate.setDate(startDate.getDate() + diff);
       startDate.setHours(
-        Number(newStartTime.slice(0, 2)),
-        Number(newStartTime.slice(3, 5)),
+        Number(newStartHHMM.slice(0, 2)),
+        Number(newStartHHMM.slice(3, 5)),
         0,
         0
       );
 
       const endDate = new Date(startDate);
       endDate.setHours(
-        Number(newEndTime.slice(0, 2)),
-        Number(newEndTime.slice(3, 5)),
+        Number(newEndHHMM.slice(0, 2)),
+        Number(newEndHHMM.slice(3, 5)),
         0,
         0
       );
@@ -183,20 +222,22 @@ export function useDragResize({ events, setEvents, timelineEnd = "18:00" }: Para
         )
       );
 
-      // update attrs so placement logic is consistent if needed
-      a.setAttribute("data-start", newStartTime);
-      a.setAttribute("data-end", newEndTime);
+      // 3) update attrs so placement logic is consistent if needed
+      a.setAttribute("data-start", newStartHHMM);
+      a.setAttribute("data-end", newEndHHMM);
 
+      // update text time (nếu có)
       const timeEl = a.querySelector(".cd-schedule__time");
-      if (timeEl) timeEl.textContent = `${newStartTime} - ${newEndTime}`;
+      if (timeEl) timeEl.textContent = `${newStartHHMM} - ${newEndHHMM}`;
     };
 
     const cleanupFns: Array<() => void> = [];
 
-    // 2) attach drag/resize/dblclick
+    // ===== 4) attach listeners drag/resize + dblclick =====
     for (let i = 0; i < singleEvents.length; i++) {
       const li = singleEvents[i];
       const a = li.getElementsByTagName("a")[0];
+      if (!a) continue;
 
       const onMouseDown = (e: MouseEvent) => {
         e.preventDefault();
@@ -210,12 +251,12 @@ export function useDragResize({ events, setEvents, timelineEnd = "18:00" }: Para
         const origTop = parseFloat(li.style.top || "0");
         const origHeight = parseFloat(li.style.height || "0");
 
-        // resize zone: bottom 10px
+        // resize nếu bấm gần đáy event
         const isResize = e.offsetY > rect.height - 10;
 
         let currentGroup = li.closest(".cd-schedule__group") as HTMLElement | null;
         let currentDayIdx =
-          currentGroup?.getAttribute("data-day-index") != null
+          currentGroup?.getAttribute("data-day-index") !== null
             ? Number(currentGroup!.getAttribute("data-day-index"))
             : groups.indexOf(currentGroup!);
 
@@ -230,7 +271,7 @@ export function useDragResize({ events, setEvents, timelineEnd = "18:00" }: Para
           } else {
             li.style.top = `${origTop + dy}px`;
 
-            // detect day column by mouse centerX (NO appendChild)
+            // detect day column by mouse centerX (không appendChild vì React quản DOM)
             const centerX = startLeft + dx + rect.width / 2;
             for (let gIdx = 0; gIdx < groups.length; gIdx++) {
               const gRect = groups[gIdx].getBoundingClientRect();
@@ -246,12 +287,19 @@ export function useDragResize({ events, setEvents, timelineEnd = "18:00" }: Para
           window.removeEventListener("mousemove", onMove);
           window.removeEventListener("mouseup", onUp);
           window.removeEventListener("blur", onUp);
-          await onDragEndUpdate(li, a, currentDayIdx);
+
+          try {
+            await onDragEndUpdate(li, a, currentDayIdx);
+          } catch (err) {
+            console.error("Drag/resize update failed:", err);
+          }
         };
 
         window.addEventListener("mousemove", onMove);
         window.addEventListener("mouseup", onUp);
-        window.addEventListener("blur", onUp); // tránh kẹt khi mở DevTools
+
+        // tránh bị “kẹt drag” khi bạn mở DevTools / mất focus
+        window.addEventListener("blur", onUp);
       };
 
       li.addEventListener("mousedown", onMouseDown);
@@ -261,6 +309,7 @@ export function useDragResize({ events, setEvents, timelineEnd = "18:00" }: Para
         e.preventDefault();
         const idStr = li.dataset.eventId;
         if (!idStr) return;
+
         const ev = events.find((x) => x.id === Number(idStr));
         if (!ev) return;
 
@@ -282,5 +331,5 @@ export function useDragResize({ events, setEvents, timelineEnd = "18:00" }: Para
     }
 
     return () => cleanupFns.forEach((fn) => fn());
-  }, [events, setEvents, timelineEnd]);
+  }, [events, setEvents, timelineMinHHMM, timelineMaxHHMM, getToken]);
 }
