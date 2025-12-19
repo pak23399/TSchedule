@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-
+import styles from "./register.module.css";
 export default function RegisterPage() {
   const router = useRouter();
 
@@ -50,97 +50,111 @@ export default function RegisterPage() {
   };
 
   return (
-    <div style={{ maxWidth: 480, margin: "40px auto", padding: 16 }}>
-      <h1 style={{ fontSize: 28, fontWeight: 700, marginBottom: 16 }}>
-        Register
-      </h1>
+   <div className={styles.pageRoot}>
+    <section className={styles.section}>
+      {/* background decorative image */}
+      <img
+        className={styles.bgEclipse}
+        src="/images/sign-up-eclipse-light-green.png"
+        alt=""
+        aria-hidden
+      />
 
-      {err && (
-        <div style={{ color: "crimson", marginBottom: 12 }}>
-          {err}
-        </div>
-      )}
-
-      <form onSubmit={onSubmit} style={{ display: "grid", gap: 10 }}>
-        <label style={{ display: "grid", gap: 6 }}>
-          <span>Full name</span>
-          <input
-            value={fullName}
-            onChange={(e) => setFullName(e.target.value)}
-            placeholder="Nguyễn Văn A"
-            required
-            style={{ padding: 10, border: "1px solid #ccc", borderRadius: 8 }}
-          />
-        </label>
-
-        <label style={{ display: "grid", gap: 6 }}>
-          <span>Email</span>
-          <input
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="email@example.com"
-            type="email"
-            required
-            style={{ padding: 10, border: "1px solid #ccc", borderRadius: 8 }}
-          />
-        </label>
-
-        <label style={{ display: "grid", gap: 6 }}>
-          <span>Time zone</span>
-          <input
-            value={timeZone}
-            onChange={(e) => setTimeZone(e.target.value)}
-            placeholder="Asia/Ho_Chi_Minh"
-            style={{ padding: 10, border: "1px solid #ccc", borderRadius: 8 }}
-          />
-          <small style={{ opacity: 0.7 }}>
-            (Backend của bạn đang nhận field <code>TimeZone</code> trong DTO.)
-          </small>
-        </label>
-
-        <label style={{ display: "grid", gap: 6 }}>
-          <span>Password</span>
-          <input
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            type="password"
-            required
-            style={{ padding: 10, border: "1px solid #ccc", borderRadius: 8 }}
-          />
-        </label>
-
-        <label style={{ display: "grid", gap: 6 }}>
-          <span>Confirm password</span>
-          <input
-            value={confirm}
-            onChange={(e) => setConfirm(e.target.value)}
-            type="password"
-            required
-            style={{ padding: 10, border: "1px solid #ccc", borderRadius: 8 }}
-          />
-        </label>
-
-        <button
-          type="submit"
-          disabled={loading}
-          style={{
-            marginTop: 6,
-            padding: "10px 12px",
-            borderRadius: 8,
-            border: "1px solid #111",
-            cursor: loading ? "not-allowed" : "pointer",
-          }}
-        >
-          {loading ? "Creating account..." : "Create account"}
-        </button>
-
-        <div style={{ marginTop: 6 }}>
-          Đã có tài khoản?{" "}
-          <a href="/login" style={{ textDecoration: "underline" }}>
-            Login
+      <div className={styles.container}>
+        {/* logo */}
+        {/* <div className={styles.logoWrap}>
+          <a className={styles.logoLink} href="/">
+            <img
+              className={styles.logo}
+              src="/images/brand.svg"
+              alt="Brand logo"
+            />
           </a>
+        </div> */}
+
+        {/* form card */}
+        <div className={styles.card}>
+          <h1 className={styles.title}>Create your account</h1>
+          <p className={styles.subtitle}>Sign up to start using the timetable ✨</p>
+
+          {err && <div className={styles.error}>{err}</div>}
+
+          <form onSubmit={onSubmit} className={styles.form}>
+            <label className={styles.label}>
+              <span>Full name</span>
+              <input
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                placeholder="Nguyễn Văn A"
+                required
+                className={styles.input}
+              />
+            </label>
+
+            <label className={styles.label}>
+              <span>Email</span>
+              <input
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="email@example.com"
+                type="email"
+                required
+                className={styles.input}
+              />
+            </label>
+
+            <label className={styles.label}>
+              <span>Time zone</span>
+              <input
+                value={timeZone}
+                onChange={(e) => setTimeZone(e.target.value)}
+                placeholder="Asia/Ho_Chi_Minh"
+                className={styles.input}
+              />
+              <small className={styles.hint}>
+                Backend của bạn đang nhận field <code>TimeZone</code>.
+              </small>
+            </label>
+
+            <label className={styles.label}>
+              <span>Password</span>
+              <input
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                type="password"
+                required
+                className={styles.input}
+              />
+            </label>
+
+            <label className={styles.label}>
+              <span>Confirm password</span>
+              <input
+                value={confirm}
+                onChange={(e) => setConfirm(e.target.value)}
+                type="password"
+                required
+                className={styles.input}
+              />
+            </label>
+
+            <button type="submit" disabled={loading} className={styles.button}>
+              {loading ? "Creating account..." : "Create account"}
+            </button>
+          </form>
         </div>
-      </form>
-    </div>
-  );
+
+        {/* bottom link */}
+        <div className={styles.bottomText}>
+          <p>
+            <span className={styles.muted}>Already have an account? </span>
+            <a className={styles.link} href="/login">
+              Login
+            </a>
+          </p>
+        </div>
+      </div>
+    </section>
+  </div>
+);
 }

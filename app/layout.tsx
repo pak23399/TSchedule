@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import "./styles/style.css"
 import  { LogoutButton } from "./components/LogoutButton";
+import AuthGate from "./components/AuthGate";
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
@@ -34,7 +35,7 @@ export default function RootLayout({
       >
         <div style={{ fontWeight: 700 }}>Schedule App</div>
           <LogoutButton />
-        {children}
+          <AuthGate>{children}</AuthGate>
       </body>
     </html>
   );

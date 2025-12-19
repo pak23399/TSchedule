@@ -69,11 +69,10 @@ export default function Page() {
   const weekEnd = addDays(weekStart, 6);
 
   // Data layer: load week + grouped + createEvent
-  const { events, setEvents, loading, setLoading, grouped, createEvent } =
-    useSchedule(weekStart, 1);
+  const { events, setEvents, loading, setLoading, grouped, createEvent } = useSchedule(weekStart);
 
   // Drag/resize layer: ALL in hook now (no drag logic in page.tsx)
-  useDragResize({ events, setEvents, timelineEnd: "18:00" });
+  useDragResize({events,setEvents,timelineMaxHHMM: "18:00",});
 
   return (
     <>

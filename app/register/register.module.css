@@ -1,0 +1,137 @@
+.page {
+  min-height: 100vh;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 16px;
+}
+
+.bg {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(900px 420px at 18% 12%, rgba(46, 213, 178, 0.18), transparent 60%),
+    radial-gradient(900px 420px at 85% 88%, rgba(255, 204, 0, 0.14), transparent 60%),
+    linear-gradient(180deg, #f5f7fa, #ffffff);
+}
+
+.section {
+  min-height: 100vh;
+  position: relative;
+
+  /* canh giữa */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 40px 16px;
+}
+
+
+.container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+  width: 100%;
+  max-width: 520px;
+  z-index: 1;
+}
+
+.card {
+  background: rgba(255, 255, 255, 0.95);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 16px;
+  padding: 22px 20px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.08);
+  backdrop-filter: blur(6px);
+}
+
+.title {
+  margin: 0 0 6px 0;
+  font-size: 24px;
+  font-weight: 700;
+}
+
+.subTitle {
+  margin: 0 0 16px 0;
+  color: rgba(0, 0, 0, 0.55);
+  font-size: 14px;
+}
+
+.error {
+  background: rgba(245, 66, 81, 0.08);
+  border: 1px solid rgba(245, 66, 81, 0.25);
+  color: rgba(130, 0, 0, 0.9);
+  padding: 10px 12px;
+  border-radius: 12px;
+  margin-bottom: 12px;
+  font-size: 14px;
+}
+
+.form {
+  display: grid;
+  gap: 12px;
+}
+
+.label {
+  display: grid;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.input {
+  height: 44px;
+  padding: 0 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(0, 0, 0, 0.14);
+  background: white;
+  outline: none;
+}
+
+.input:focus {
+  border-color: rgba(46, 213, 178, 0.9);
+  box-shadow: 0 0 0 3px rgba(46, 213, 178, 0.18);
+}
+
+.hint {
+  font-size: 12px;
+  opacity: 0.7;
+  margin-top: 2px;
+}
+
+.button {
+  margin-top: 4px;
+  height: 46px;
+  border: none;
+  border-radius: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  background: rgba(46, 213, 178, 1);
+  color: white;
+}
+
+.button:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.footer {
+  margin-top: 10px;
+  font-size: 14px;
+  text-align: center;
+  color: rgba(0, 0, 0, 0.6);
+}
+
+.link {
+  font-weight: 700;
+  color: rgba(46, 213, 178, 1);
+  text-decoration: none;
+}
+
+.link:hover {
+  text-decoration: underline;
+}

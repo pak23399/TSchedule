@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import styles from "./login.module.css";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -14,10 +15,16 @@ export default function LoginPage() {
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErr(null);
-    setLoading(true);
 
+    const apiBase = process.env.NEXT_PUBLIC_API_URL;
+    if (!apiBase) {
+      setErr("Missing NEXT_PUBLIC_API_URL in .env.local");
+      return;
+    }
+
+    setLoading(true);
     try {
-      const r = await fetch("/api/auth/login", {
+      const r = await fetch(`${apiBase}/api/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
@@ -26,11 +33,20 @@ export default function LoginPage() {
       const data = await r.json().catch(() => ({}));
 
       if (!r.ok) {
-        setErr(data?.error || "Login failed");
+        setErr(data?.message || data?.error || "Login failed");
         return;
       }
 
-      // cookie httpOnly đã được set ở route.ts
+      // Backend .NET của bạn trả field "Token" (T hoa)
+      const token = data?.token ?? data?.token;
+      if (!token) {
+        setErr("Login succeeded but token is missing in response.");
+        return;
+      }
+
+      // ✅ Lưu token để eventsAPI.ts gắn Authorization: Bearer ...
+      localStorage.setItem("accessToken", token);
+
       router.push("/"); // hoặc "/schedule"
       router.refresh();
     } catch (e: any) {
@@ -41,61 +57,59 @@ export default function LoginPage() {
   };
 
   return (
-    <div style={{ maxWidth: 420, margin: "40px auto", padding: 16 }}>
-      <h1 style={{ fontSize: 28, fontWeight: 700, marginBottom: 16 }}>Login</h1>
+   <div className={styles.page}>
+    {/* background */}
+    <div className={styles.bg} aria-hidden />
 
-      {err && (
-        <div style={{ color: "crimson", marginBottom: 12 }}>
-          {err}
-        </div>
-      )}
+    <div className={styles.container}>
+      <div className={styles.card}>
+        <h1 className={styles.title}>Đăng nhập</h1>
+        <p className={styles.subTitle}>Chào mừng bạn quay lại 👋</p>
 
-      <form onSubmit={onSubmit} style={{ display: "grid", gap: 10 }}>
-        <label style={{ display: "grid", gap: 6 }}>
-          <span>Email</span>
-          <input
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="email@example.com"
-            type="email"
-            required
-            style={{ padding: 10, border: "1px solid #ccc", borderRadius: 8 }}
-          />
-        </label>
+        {err && <div className={styles.error}>{err}</div>}
 
-        <label style={{ display: "grid", gap: 6 }}>
-          <span>Password</span>
-          <input
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="••••••••"
-            type="password"
-            required
-            style={{ padding: 10, border: "1px solid #ccc", borderRadius: 8 }}
-          />
-        </label>
+        <form onSubmit={onSubmit} className={styles.form}>
+          <label className={styles.label}>
+            <span>Email</span>
+            <input
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="email@example.com"
+              type="email"
+              required
+              className={styles.input}
+            />
+          </label>
 
-        <button
-          type="submit"
-          disabled={loading}
-          style={{
-            marginTop: 6,
-            padding: "10px 12px",
-            borderRadius: 8,
-            border: "1px solid #111",
-            cursor: loading ? "not-allowed" : "pointer",
-          }}
-        >
-          {loading ? "Logging in..." : "Login"}
-        </button>
+          <label className={styles.label}>
+            <span>Password</span>
+            <input
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="••••••••"
+              type="password"
+              required
+              className={styles.input}
+            />
+          </label>
 
-        <div style={{ marginTop: 6 }}>
-          Chưa có tài khoản?{" "}
-          <a href="/register" style={{ textDecoration: "underline" }}>
-            Register
-          </a>
-        </div>
-      </form>
+          <button
+            type="submit"
+            disabled={loading}
+            className={styles.button}
+          >
+            {loading ? "Đang đăng nhập..." : "Đăng nhập"}
+          </button>
+
+          <div className={styles.footer}>
+            Chưa có tài khoản?{" "}
+            <a href="/register" className={styles.link}>
+              Đăng ký
+            </a>
+          </div>
+        </form>
+      </div>
     </div>
-  );
+  </div>
+);
 }
